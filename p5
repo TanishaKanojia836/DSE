@@ -1,0 +1,68 @@
+#Apply simple K-means algorithm for clustering any dataset. Compare the performance of
+clusters by varying the algorithm parameters. For a given set of parameters, plot a line graph
+depicting MSE obtained after each iteration.
+# SIMPLE K-MEANS CLUSTERING
+
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.datasets import load_iris
+
+# Load dataset (Iris)
+
+iris = load_iris()
+X = iris.data
+
+# Simple K-means implementation
+
+def kmeans_simple(X, k, max_iter=20):
+    n, d = X.shape
+    # initialize centroids by choosing random points
+    np.random.seed(0)
+    centroids = X[np.random.choice(n, k, replace=False)]
+
+    mse_list = []
+
+    for it in range(max_iter):
+        # Step 1: Assign points to nearest centroid
+        distances = np.linalg.norm(X[:, None] - centroids[None, :], axis=2)
+        labels = np.argmin(distances, axis=1)
+
+        # Step 2: Compute MSE (mean squared distance)
+        mse = np.mean(np.min(distances, axis=1)**2)
+        mse_list.append(mse)
+
+        # Step 3: Recompute centroids
+        new_centroids = np.zeros_like(centroids)
+        for j in range(k):
+            points = X[labels == j]
+            new_centroids[j] = points.mean(axis=0) if len(points) > 0 else centroids[j]
+
+        # Stop if converged
+        if np.allclose(new_centroids, centroids):
+            break
+        centroids = new_centroids
+
+    return labels, centroids, mse_list
+
+# Run for different values of k
+
+K_values = [2, 3, 4]
+results = {}
+
+for k in K_values:
+    labels, centroids, mse_list = kmeans_simple(X, k)
+    results[k] = mse_list
+    print(f"\nK = {k}  |  Iterations = {len(mse_list)}  |  Final MSE = {mse_list[-1]:.4f}")
+
+# Plot MSE vs Iteration
+
+plt.figure(figsize=(8,6))
+for k in K_values:
+    plt.plot(range(1, len(results[k])+1), results[k], marker='o', label=f'k = {k}')
+
+plt.title("K-Means: MSE vs Iterations")
+plt.xlabel("Iteration")
+plt.ylabel("MSE (Mean Squared Error)")
+plt.legend()
+plt.grid(True)
+plt.show()
