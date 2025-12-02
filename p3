@@ -1,0 +1,84 @@
+#Run Apriori algorithm to find frequent item sets and association rules on 2 real datasets and
+use appropriate evaluation measures to compute correctness of obtained patterns
+# --- Install ---
+!pip install mlxtend --quiet
+!pip install openpyxl --quiet
+
+import pandas as pd
+from google.colab import files
+from mlxtend.preprocessing import TransactionEncoder
+from mlxtend.frequent_patterns import apriori, association_rules
+
+# --- Upload Datasets ---
+print("Upload Dataset 1:")
+uploaded1 = files.upload()
+
+print("Upload Dataset 2:")
+uploaded2 = files.upload()
+
+# Convert uploaded files to DataFrames
+def load_transactions(uploaded_file):
+    name = list(uploaded_file.keys())[0]
+    if name.endswith(".xlsx") or name.endswith(".xls"):
+        df = pd.read_excel(name)
+    else:
+        try:
+            df = pd.read_csv(name, header=None)
+        except:
+            text = open(name, encoding="utf-8", errors="ignore").read().splitlines()
+            return [[i.strip() for i in line.split(",")] for line in text]
+
+    # If Online Retail style
+    if {"InvoiceNo","Description"}.issubset(df.columns):
+        df = df[df["Description"].notna()]
+        df["Description"] = df["Description"].astype(str).str.lower().str.strip()
+        tx = df.groupby(df["InvoiceNo"].astype(str))["Description"].apply(list).tolist()
+        return tx
+
+    # Multi-column grocery style
+    if df.shape[1] > 1:
+        tx = []
+        for _, row in df.iterrows():
+            items = [str(x).strip() for x in row if pd.notna(x)]
+            if items: tx.append(items)
+        return tx
+
+    # Single-column CSV where each cell is dict of items
+    col = df.iloc[:,0].astype(str)
+    return [[i.strip() for i in row.split(",")] for row in col]
+
+# Load transactions
+tx1 = load_transactions(uploaded1)
+tx2 = load_transactions(uploaded2)
+
+# --- Apriori function ---
+def run_apriori(transactions, name, min_s, min_c):
+    te = TransactionEncoder()
+    X = te.fit(transactions).transform(transactions)
+    df = pd.DataFrame(X, columns=te.columns_)
+
+    freq = apriori(df, min_support=min_s, use_colnames=True)
+    rules = pd.DataFrame()
+
+    if not freq.empty:
+        rules = association_rules(freq, metric="confidence", min_threshold=min_c)
+
+    print(f"\n{name} | support={min_s} | confidence={min_c}")
+    print("Frequent itemsets:", len(freq), " | Rules:", len(rules))
+
+    if not rules.empty:
+        show_cols = ["antecedents","consequents","support","confidence","lift"]
+        print(rules[show_cols].sort_values(["lift","confidence"], ascending=False).head(10))
+
+    freq.to_csv(f"{name}_freq_{int(min_s*100)}.csv", index=False)
+    rules.to_csv(f"{name}_rules_{int(min_s*100)}_{int(min_c*100)}.csv", index=False)
+
+# --- Run for both parameter sets (a) & (b) ---
+params = [(0.50,0.75), (0.60,0.60)]
+names = ["Dataset1", "Dataset2"]
+
+for (s,c) in params:
+    run_apriori(tx1, names[0], s, c)
+    run_apriori(tx2, names[1], s, c)
+
+print("\n✔ CSV saved. Download from left panel or Files tab.")
