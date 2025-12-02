@@ -1,0 +1,109 @@
+#1. Apply data cleaning techniques on any dataset (e.g., Paper Reviews dataset in UCI repository).
+Techniques may include handling missing values, outliers and inconsistent values. A set of validation
+rules can be prepared based on the dataset and validations can be performed.
+import pandas as pd
+import numpy as np
+from google.colab import files
+
+# STEP 1 — LOAD THE DATASET
+
+print("Upload your Paper Reviews CSV file:")
+uploaded = files.upload()
+filename = list(uploaded.keys())[0]
+
+df = pd.read_csv(filename)
+
+print("\n--- FIRST 5 ROWS ---")
+display(df.head())
+
+print("\n--- DATA INFO ---")
+print(df.info())
+
+print("\n--- MISSING VALUES ---")
+print(df.isna().sum())
+
+# HANDLE MISSING VALUES
+
+# Fill missing preliminary decisions with "unknown"
+df['preliminary_decision'] = df['preliminary_decision'].fillna("unknown")
+
+# Fill missing review list with empty list or empty string
+df['review'] = df['review'].fillna("[]")
+
+# Drop rows with missing ID (critical key)
+df = df.dropna(subset=['id'])
+
+print("\n--- After handling missing ---")
+print(df.isna().sum())
+
+# FIX INCONSISTENT VALUES
+
+# Standardize all decisions (lowercase + strip)
+df['preliminary_decision'] = df['preliminary_decision'].str.lower().str.strip()
+
+# Map similar terms to consistent category
+mapping = {
+    'accept': 'accept',
+    'accepted': 'accept',
+    'probably accept': 'probably accept',
+    'probablyaccept': 'probably accept',
+    'prob accept': 'probably accept',
+    'reject': 'reject',
+    'rejected': 'reject',
+    'probably reject': 'probably reject',
+    'probablyreject': 'probably reject',
+    'prob reject': 'probably reject'
+}
+
+df['preliminary_decision'] = df['preliminary_decision'].replace(mapping)
+
+# If value is not in allowed list → mark as unknown
+allowed = ['accept', 'reject', 'probably accept', 'probably reject', 'unknown']
+df['preliminary_decision'] = df['preliminary_decision'].apply(
+    lambda x: x if x in allowed else "unknown"
+)
+
+print("\n--- After fixing inconsistencies ---")
+df['preliminary_decision'].value_counts()
+
+# STEP 4 — OUTLIER DETECTION (On length of review text)
+
+# Convert review list to simple length indicator
+df['review_length'] = df['review'].astype(str).apply(len)
+
+# IQR method
+Q1 = df['review_length'].quantile(0.25)
+Q3 = df['review_length'].quantile(0.75)
+IQR = Q3 - Q1
+
+lower = Q1 - 1.5 * IQR
+upper = Q3 + 1.5 * IQR
+
+df['is_outlier_review'] = (df['review_length'] < lower) | (df['review_length'] > upper)
+
+print("\nOutlier counts in review lengths:")
+print(df['is_outlier_review'].sum())
+
+# VALIDATION RULES
+
+def validate_row(row):
+    errors = []
+
+    # Rule 1: ID must be integer and > 0
+    if row['id'] <= 0:
+        errors.append("Invalid ID")
+
+    # Rule 2: Decision must be allowed category
+    if row['preliminary_decision'] not in allowed:
+        errors.append("Invalid decision")
+
+    # Rule 3: Review list cannot be empty string
+    if row['review'] is None or row['review'] == "":
+        errors.append("Missing review")
+
+    return "; ".join(errors) if errors else None
+
+df['validation_errors'] = df.apply(validate_row, axis=1)
+
+print("\n--- VALIDATION ERRORS ---")
+print(df['validation_errors'].value_counts())
