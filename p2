@@ -1,0 +1,89 @@
+#Apply data pre-processing techniques such as standardization/normalization, transformation,
+aggregation, discretization/binarization, sampling etc. on any dataset
+# DATA PRE-PROCESSING TECHNIQUES
+
+import pandas as pd
+import numpy as np
+from google.colab import files
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, Binarizer, KBinsDiscretizer
+from sklearn.model_selection import train_test_split
+# UPLOAD DATASET
+print("Upload your CSV or Excel file:")
+uploaded = files.upload()
+filename = list(uploaded.keys())[0]
+
+# Auto-detect CSV or Excel
+if filename.endswith(".csv"):
+    df = pd.read_csv(filename)
+else:
+    df = pd.read_excel(filename)
+
+print("\nDataset Loaded Successfully!")
+display(df.head())
+print(df.info())
+
+# Select only numeric columns for processing
+num_df = df.select_dtypes(include=['float64', 'int64'])
+print("\nNumeric Columns:")
+display(num_df.head())
+
+# 2. STANDARDIZATION (Z-score)
+
+scaler = StandardScaler()
+standardized = scaler.fit_transform(num_df)
+standardized_df = pd.DataFrame(standardized, columns=num_df.columns)
+
+print("\n--- STANDARDIZED DATA (Z-score) ---")
+display(standardized_df.head())
+
+# 3. NORMALIZATION (0-1 MinMax)
+
+norm = MinMaxScaler()
+normalized = norm.fit_transform(num_df)
+normalized_df = pd.DataFrame(normalized, columns=num_df.columns)
+
+print("\n--- NORMALIZED DATA (0-1) ---")
+display(normalized_df.head())
+
+# 4. TRANSFORMATION (Log + sqrt)
+
+transformed_df = num_df.copy()
+
+for col in num_df.columns:
+    transformed_df[col+"_log"] = np.log1p(num_df[col])   # +1 to avoid log(0)
+    transformed_df[col+"_sqrt"] = np.sqrt(num_df[col].clip(lower=0))  # avoid negatives
+
+print("\n--- TRANSFORMED DATA (log & sqrt) ---")
+display(transformed_df.head())
+
+# 5. AGGREGATION
+# Example: compute mean value for each numeric column
+
+aggregation_df = num_df.agg(["mean", "median", "min", "max"])
+print("\n--- AGGREGATION (mean, median, min, max) ---")
+display(aggregation_df)
+
+# 6. DISCRETIZATION (BINNING)
+# Equal-width binning into 3 bins
+
+kb = KBinsDiscretizer(n_bins=3, encode='ordinal', strategy='uniform')
+disc_data = kb.fit_transform(num_df)
+discretized_df = pd.DataFrame(disc_data, columns=num_df.columns)
+
+print("\n--- DISCRETIZED DATA (3 bins) ---")
+display(discretized_df.head())
+
+# 7. BINARIZATION (threshold = median)
+binarizer = Binarizer(threshold=num_df.median().mean())
+binary_data = binarizer.fit_transform(num_df)
+binary_df = pd.DataFrame(binary_data, columns=num_df.columns)
+
+print("\n--- BINARIZED DATA (0/1) ---")
+display(binary_df.head())
+
+# 8. SAMPLING
+# Random sampling (20% of data)
+sample_df = df.sample(frac=0.2, random_state=42)
+
+print("\n--- RANDOM SAMPLE (20% of data) ---")
+display(sample_df.head())
